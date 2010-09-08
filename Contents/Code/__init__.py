@@ -517,23 +517,32 @@ class TVDBAgent(Agent.TV_Shows):
     @parallelize
     def DownloadImages():
 
+      def banner_data():
+        return GetResultFromNetwork(banner_root + banner_thumb, False)
+
+      def parse_banner(banner_el):
+        # Get the image attributes from the XML
+        banner_type = el_text(banner_el, 'BannerType')
+        banner_path = el_text(banner_el, 'BannerPath')
+        try:
+          banner_thumb = el_text(banner_el, 'ThumbnailPath')
+          proxy = Proxy.Preview
+        except:
+          banner_thumb = banner_path
+          proxy = Proxy.Media
+        banner_lang = el_text(banner_el, 'Language')
+        
+        return (banner_type, banner_path, banner_lang, banner_thumb, proxy)
+
       # Add a download task for each image
       i = 0
       for banner_el in banners_el.xpath('Banner'):
         i += 1
         @task
         def DownloadImage(metadata=metadata, banner_el=banner_el, i=i):
-          
-          # Get the image attributes from the XML
-          banner_type = el_text(banner_el, 'BannerType')
-          banner_path = el_text(banner_el, 'BannerPath')
-          try:
-            banner_thumb = el_text(banner_el, 'ThumbnailPath')
-            proxy = Proxy.Preview
-          except:
-            banner_thumb = banner_path
-            proxy = Proxy.Media
-          banner_lang = el_text(banner_el, 'Language')
+
+          # Parse the banner.
+          banner_type, banner_path, banner_langbanner_thumb, proxy = parse_banner(banner_el)
           
           # Check that the language matches
           if banner_lang != lang:
@@ -541,8 +550,6 @@ class TVDBAgent(Agent.TV_Shows):
             
           # Compute the banner name and prepare the data
           banner_name = banner_root + banner_path
-          def banner_data():
-            return GetResultFromNetwork(banner_root + banner_thumb, False)
         
           # Find the attribute to add to based on the image type, checking that data doesn't
           # already exist before downloading
@@ -581,7 +588,16 @@ class TVDBAgent(Agent.TV_Shows):
             else:
               #Log('No media for season %s - skipping download of %s', season_num, banner_name)
               pass
-              
+      
+      # If we didn't have any fanart in english, it's possible that fanart in another language exists.
+      if len(metadata.art) == 0 and lang == 'en':
+        i = 0
+        for banner_el in banners_el.xpath('Banner'):
+          banner_type, banner_path, banner_lang, banner_thumb, proxy = parse_banner(banner_el)
+          banner_name = banner_root + banner_path
+          if banner_type == 'fanart' and banner_name not in metadata.art:
+            try: metadata.art[banner_name] = proxy(banner_data(), sort_order=i)
+            except: raise
               
   def util_cleanShow(self, cleanShow, scrubList):
     for word in scrubList:
