@@ -542,7 +542,7 @@ class TVDBAgent(Agent.TV_Shows):
         def DownloadImage(metadata=metadata, banner_el=banner_el, i=i):
 
           # Parse the banner.
-          banner_type, banner_path, banner_langbanner_thumb, proxy = parse_banner(banner_el)
+          banner_type, banner_path, banner_lang, banner_thumb, proxy = parse_banner(banner_el)
           
           # Check that the language matches
           if banner_lang != lang:
