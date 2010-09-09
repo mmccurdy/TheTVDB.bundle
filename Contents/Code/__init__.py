@@ -513,26 +513,9 @@ class TVDBAgent(Agent.TV_Shows):
                 except:
                   # tvdb doesn't have a thumb for this show
                   pass
-      
+
     @parallelize
     def DownloadImages():
-
-      def banner_data():
-        return GetResultFromNetwork(banner_root + banner_thumb, False)
-
-      def parse_banner(banner_el):
-        # Get the image attributes from the XML
-        banner_type = el_text(banner_el, 'BannerType')
-        banner_path = el_text(banner_el, 'BannerPath')
-        try:
-          banner_thumb = el_text(banner_el, 'ThumbnailPath')
-          proxy = Proxy.Preview
-        except:
-          banner_thumb = banner_path
-          proxy = Proxy.Media
-        banner_lang = el_text(banner_el, 'Language')
-        
-        return (banner_type, banner_path, banner_lang, banner_thumb, proxy)
 
       # Add a download task for each image
       i = 0
@@ -542,7 +525,7 @@ class TVDBAgent(Agent.TV_Shows):
         def DownloadImage(metadata=metadata, banner_el=banner_el, i=i):
 
           # Parse the banner.
-          banner_type, banner_path, banner_lang, banner_thumb, proxy = parse_banner(banner_el)
+          banner_type, banner_path, banner_lang, banner_thumb, proxy = self.parse_banner(banner_el)
           
           # Check that the language matches
           if banner_lang != lang:
@@ -554,16 +537,16 @@ class TVDBAgent(Agent.TV_Shows):
           # Find the attribute to add to based on the image type, checking that data doesn't
           # already exist before downloading
           if banner_type == 'fanart' and banner_name not in metadata.art:
-            try: metadata.art[banner_name] = proxy(banner_data(), sort_order=i)
+            try: metadata.art[banner_name] = proxy(self.banner_data(banner_root + banner_thumb), sort_order=i)
             except: pass
 
           elif banner_type == 'poster' and banner_name not in metadata.posters:
-            try: metadata.posters[banner_name] = proxy(banner_data(), sort_order=i)
+            try: metadata.posters[banner_name] = proxy(self.banner_data(banner_root + banner_thumb), sort_order=i)
             except: pass
 
           elif banner_type == 'series':
             if banner_name not in metadata.banners:
-              try: metadata.banners[banner_name] = proxy(banner_data(), sort_order=i)
+              try: metadata.banners[banner_name] = proxy(self.banner_data(banner_root + banner_thumb), sort_order=i)
               except: pass
 
           elif banner_type == 'season':
@@ -578,11 +561,11 @@ class TVDBAgent(Agent.TV_Shows):
             
             if media is None or season_num in media.seasons or date_based_season in media.seasons:
               if banner_type_2 == 'season' and banner_name not in metadata.seasons[season_num].posters:
-                try: metadata.seasons[season_num].posters[banner_name] = proxy(banner_data(), sort_order=i)
+                try: metadata.seasons[season_num].posters[banner_name] = proxy(self.banner_data(banner_root + banner_thumb), sort_order=i)
                 except: pass
 
               elif banner_type_2 == 'seasonwide' and banner_name not in metadata.seasons[season_num].banners:
-                try: metadata.seasons[season_num].banners[banner_name] = proxy(banner_data(), sort_order=i)
+                try: metadata.seasons[season_num].banners[banner_name] = proxy(self.banner_data(banner_root + banner_thumb), sort_order=i)
                 except: pass
             
             else:
@@ -593,12 +576,31 @@ class TVDBAgent(Agent.TV_Shows):
       if len(metadata.art) == 0 and lang == 'en':
         i = 0
         for banner_el in banners_el.xpath('Banner'):
-          banner_type, banner_path, banner_lang, banner_thumb, proxy = parse_banner(banner_el)
+          banner_type, banner_path, banner_lang, banner_thumb, proxy = self.parse_banner(banner_el)
           banner_name = banner_root + banner_path
           if banner_type == 'fanart' and banner_name not in metadata.art:
-            try: metadata.art[banner_name] = proxy(banner_data(), sort_order=i)
+            try: metadata.art[banner_name] = proxy(self.banner_data(banner_root + banner_thumb), sort_order=i)
             except: raise
               
+  def parse_banner(self, banner_el):
+    el_text = lambda element, xp: element.xpath(xp)[0].text if element.xpath(xp)[0].text else '' 
+    
+    # Get the image attributes from the XML
+    banner_type = el_text(banner_el, 'BannerType')
+    banner_path = el_text(banner_el, 'BannerPath')
+    try:
+      banner_thumb = el_text(banner_el, 'ThumbnailPath')
+      proxy = Proxy.Preview
+    except:
+      banner_thumb = banner_path
+      proxy = Proxy.Media
+    banner_lang = el_text(banner_el, 'Language')
+
+    return (banner_type, banner_path, banner_lang, banner_thumb, proxy)
+
+  def banner_data(self, path):
+    return GetResultFromNetwork(path, False)
+
   def util_cleanShow(self, cleanShow, scrubList):
     for word in scrubList:
       c = word.lower()
