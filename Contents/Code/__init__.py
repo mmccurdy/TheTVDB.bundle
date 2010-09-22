@@ -2,11 +2,11 @@ import re, time, unicodedata
 
 # Define proxy for TVDB.
 TVDB_SITE  = 'thetvdb.com'
-TVDB_PROXY = 'thetvdb.plexapp.com:27639'
+TVDB_PROXY = 'thetvdb.plexapp.com'
 
 # Define proxy for TV Rage.
 TVRAGE_SITE = 'tvrage.com'
-TVRAGE_PROXY = 'tvrage.plexapp.com:27640'
+TVRAGE_PROXY = 'tvrage.plexapp.com'
 
 TVDB_API_KEY    = 'D4DDDAEFAD083E6F'
 TVDB_MIRROR_URL = 'http://%s/api/%s/mirrors.xml' % (TVDB_PROXY, TVDB_API_KEY)
@@ -103,8 +103,7 @@ def Start():
   
   Dict['ZIP_MIRROR'] = 'http://' + TVDB_PROXY
   Dict['IMG_MIRROR'] = 'http://' + TVDB_PROXY
-  HTTP.CacheTime = CACHE_1DAY
-  
+  HTTP.CacheTime = CACHE_1HOUR * 4
   
 class TVDBAgent(Agent.TV_Shows):
   
