@@ -46,7 +46,7 @@ THETVDB_LANGUAGES_CODE = {'zh': '6', 'en':'7', 'sv': '8', 'no': '9', 'da': '10',
 successCount = 0
 failureCount = 0
 
-MIN_RETRY_TIMEOUT = 5
+MIN_RETRY_TIMEOUT = 2
 RETRY_TIMEOUT = MIN_RETRY_TIMEOUT
 TOTAL_TRIES   = 2
 BACKUP_TRIES  = -1
@@ -55,6 +55,9 @@ headers = {'User-agent': 'Plex/Nine'}
 
 def GetResultFromNetwork(url, fetchContent=True):
   global successCount, failureCount, RETRY_TIMEOUT
+
+  # Not sure where this is introduced, but avoid spaces.
+  url = url.replace(' ','+')
   
   try:
     netLock.acquire()
@@ -78,7 +81,12 @@ def GetResultFromNetwork(url, fetchContent=True):
         # DONE!
         return result
         
-      except:
+      except Exception, e:
+        
+        # Fast fail a not found.
+        if e.code == 404:
+          return None
+        
         failureCount += 1
         Log("Failure (%d in a row)" % failureCount)
         successCount = 0
