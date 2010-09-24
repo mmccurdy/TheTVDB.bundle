@@ -48,7 +48,7 @@ failureCount = 0
 
 MIN_RETRY_TIMEOUT = 2
 RETRY_TIMEOUT = MIN_RETRY_TIMEOUT
-TOTAL_TRIES   = 2
+TOTAL_TRIES   = 1
 BACKUP_TRIES  = -1
 
 headers = {'User-agent': 'Plex/Nine'}
@@ -111,7 +111,7 @@ def Start():
   
   Dict['ZIP_MIRROR'] = 'http://' + TVDB_PROXY
   Dict['IMG_MIRROR'] = 'http://' + TVDB_PROXY
-  HTTP.CacheTime = CACHE_1HOUR * 4
+  HTTP.CacheTime = CACHE_1HOUR * 24
   
 class TVDBAgent(Agent.TV_Shows):
   
