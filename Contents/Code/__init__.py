@@ -67,7 +67,7 @@ def GetResultFromNetwork(url, fetchContent=True):
     while tries > 0:
 
       try:
-        result = HTTP.Request(url, headers=headers)
+        result = HTTP.Request(url, headers=headers, timeout=60)
         if fetchContent:
           result = result.content
         
@@ -131,7 +131,7 @@ class TVDBAgent(Agent.TV_Shows):
     media.show = unicodedata.normalize('NFC', unicode(media.show))
     
     # If we got passed in something that looks like an ID, use it.
-    if re.match('[0-9]+', media.show) is not None:
+    if re.match('[0-9]+', media.show) is not None and len(media.show) > 4:
       url = TVDB_PROXY + '?tab=series&id=' + media.show
       self.TVDBurlParse(media, lang, results, 100, 0, url)
     
