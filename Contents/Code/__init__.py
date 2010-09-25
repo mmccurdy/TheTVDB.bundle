@@ -57,7 +57,7 @@ def GetResultFromNetwork(url, fetchContent=True):
   global successCount, failureCount, RETRY_TIMEOUT
 
   # Not sure where this is introduced, but avoid spaces.
-  url = url.replace(' ','+')
+  #url = url.replace(' ','+')
   
   try:
     netLock.acquire()
