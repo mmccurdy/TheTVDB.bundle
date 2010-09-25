@@ -128,10 +128,10 @@ class TVDBAgent(Agent.TV_Shows):
   def search(self, results, media, lang):
     
     # MAKE SURE WE USE precomposed form, since that seems to be what TVDB prefers.
-    media.show = unicodedata.normalize('NFC', unicode(media.show))
+    media.show = unicodedata.normalize('NFC', unicode(media.show)).strip()
     
     # If we got passed in something that looks like an ID, use it.
-    if re.match('[0-9]+', media.show) is not None and len(media.show) > 4:
+    if re.match('^[0-9]+$', media.show) is not None:
       url = TVDB_PROXY + '?tab=series&id=' + media.show
       self.TVDBurlParse(media, lang, results, 100, 0, url)
     
