@@ -246,26 +246,26 @@ class TVDBAgent(Agent.TV_Shows):
         self.ParseSeries(media, el, lang, results, 96)
     except:
       pass
-    
+      
     #try advanced tvdb search
     #first see if we have any networks in title
-    networks = ''
-    w = media.show.lower().split(' ')
-    for k in NETWORK_IN_TITLE:
-      if k.lower() in w:
-        networks = networks + k + '+'
-    searchForTitle =  self.util_cleanShow(media.show, SCRUB_FROM_TITLE_SEARCH_KEYWORDS + NETWORK_IN_TITLE).strip()
-    ADVscore = 99
-    year= ''
-    if year:
-      year = str(media.year)
-    try:
-      for el in  HTML.ElementFromString(GetResultFromNetwork(TVDB_ADVSEARCH_NETWORK % (searchForTitle, year, networks[:-1], lang))).xpath('//table[@id="listtable"]//tr')[1:10]:
-        url = el.xpath('.//a')[0].get('href').replace('&amp;','&')
-        self.TVDBurlParse(media, lang, results, ADVscore, 0, url)
-        ADVscore = ADVscore - 1
-    except:
-      pass
+    #networks = ''
+    #w = media.show.lower().split(' ')
+    #for k in NETWORK_IN_TITLE:
+    #  if k.lower() in w:
+    #    networks = networks + k + '+'
+    #searchForTitle =  self.util_cleanShow(media.show, SCRUB_FROM_TITLE_SEARCH_KEYWORDS + NETWORK_IN_TITLE).strip()
+    #ADVscore = 99
+    #year= ''
+    #if year:
+    #  year = str(media.year)
+    #try:
+    #  for el in  HTML.ElementFromString(GetResultFromNetwork(TVDB_ADVSEARCH_NETWORK % (searchForTitle, year, networks[:-1], lang))).xpath('//table[@id="listtable"]//tr')[1:10]:
+    #    url = el.xpath('.//a')[0].get('href').replace('&amp;','&')
+    #    self.TVDBurlParse(media, lang, results, ADVscore, 0, url)
+    #    ADVscore = ADVscore - 1
+    #except:
+    #  pass
           
     #run through tvRage -> tvdb name matches. the challenge with this is that it can only help a little...there is no tvrage->thetvdb lookup today.
     score = 100
