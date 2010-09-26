@@ -1,4 +1,4 @@
-import re, time, unicodedata
+import re, time, unicodedata, hashlib
 
 # Define proxy for TVDB.
 TVDB_SITE  = 'thetvdb.com'
@@ -14,6 +14,7 @@ TVDB_SEARCH_URL = 'http://%s/api/GetSeries.php?seriesname=%%s&language=%%s' % TV
 TVDB_ADVSEARCH_TVCOM  = 'http://%s/index.php?seriesname=&fieldlocation=2&genre=&year=&network=&zap2it_id=&tvcom_id=%%s&imdb_id=&order=translation&searching=Search&tab=advancedsearch&language=%%s' % TVDB_PROXY
 TVDB_ADVSEARCH_IMDB  = 'http://%s/index.php?seriesname=&fieldlocation=2&genre=&year=&network=&zap2it_id=&tvcom_id=&imdb_id=%%s&order=translation&searching=Search&tab=advancedsearch&language=%%s' % TVDB_PROXY
 TVDB_ADVSEARCH_NETWORK  = 'http://%s/index.php?seriesname=%%s&fieldlocation=1&genre=&year=%%s&network=%%s&zap2it_id=&tvcom_id=&imdb_id=&order=translation&searching=Search&tab=advancedsearch&language=%%s' % TVDB_PROXY
+TVDB_QUICK_SEARCH = 'http://freebase.plexapp.com/tv/names/'
 
 TVDB_SERIES_URL = '%%s/api/%s/series/%%s' % TVDB_API_KEY
 TVDB_ZIP_URL    = '%s/all/%%s.zip' % TVDB_SERIES_URL
@@ -124,17 +125,86 @@ class TVDBAgent(Agent.TV_Shows):
       res = JSON.ObjectFromURL(url, cacheTime=0)
     time.sleep(0.5)
     return res
+    
+  def searchByWords(self, results, lang, origTitle, year):
+    # Process the text.
+    title = origTitle.lower()
+    title = re.sub(r'[\'":\-&,.!~()]', ' ', title)
+    title = re.sub(r'[ ]+', ' ', title)
+    
+    # Search for words.
+    show_map = {}
+    total_words = 0
+    
+    for word in title.split():
+      if word not in ['a', 'the', 'of', 'and']:
+        total_words += 1
+        wordHash = hashlib.sha1()
+        wordHash.update(word.encode('utf-8'))
+        wordHash = wordHash.hexdigest()
+        try:
+          matches = XML.ElementFromURL(TVDB_QUICK_SEARCH + lang + '/' + wordHash[0:2] + '/' + wordHash + '.xml', cacheTime=60)
+          for match in matches.xpath('//match'):
+            id = match.get('id')
+            title = match.get('title')
+            titleYear = match.get('year')
+            
+            if not show_map.has_key(id):
+              show_map[id] = [id, title, titleYear, 1]
+            else:
+              show_map[id] = [id, title, titleYear, show_map[id][3] + 1]
+        except:
+          pass
+          
+    resultList = show_map.values()  
+    resultList.sort(lambda x, y: cmp(y[3],x[3]))
+    
+    score = 90
+    for result in resultList:
+      theYear = result[2]
+      
+      # Remove year suffixes that can mess things up.
+      searchTitle = origTitle
+      if len(origTitle) > 8:
+        searchTitle = re.sub(r'([ ]+\(?[0-9]{4}\)?)', '', searchTitle)
+      
+      foundTitle = result[1]
+      if len(foundTitle) > 8:
+        foundTitle = re.sub(r'([ ]+\(?[0-9]{4}\)?)', '', foundTitle)
+      
+      # Adjust if both have 'the' prefix.
+      distTitle = searchTitle
+      distFoundTitle = foundTitle
+      if searchTitle.lower()[0:4] == 'the ' and foundTitle.lower()[0:4] == 'the ':
+        distTitle = 'xxx' + searchTitle
+        distFoundTitle = 'xxx' + foundTitle
+        
+      # Score adjustments.
+      theScore = score + len(Util.LongestCommonSubstring(distTitle, distFoundTitle))
+      theScore = theScore - int(5.0 * Util.LevenshteinDistance(searchTitle, foundTitle)) + result[3] * 2
+      if theYear != None and year != None:
+        if theYear == year:
+          theScore = theScore + 5
+        elif theYear != year:
+          theScore = theScore - 5
+      
+      results.Append(MetadataSearchResult(id=result[0], name=result[1], year=result[2], lang=lang, score=theScore))
 
   def search(self, results, media, lang):
     
     # MAKE SURE WE USE precomposed form, since that seems to be what TVDB prefers.
     media.show = unicodedata.normalize('NFC', unicode(media.show)).strip()
-    
+
     # If we got passed in something that looks like an ID, use it.
     if re.match('^[0-9]+$', media.show) is not None:
       url = TVDB_PROXY + '?tab=series&id=' + media.show
       self.TVDBurlParse(media, lang, results, 100, 0, url)
-    
+
+    # Try turbo word matches.
+    if lang == 'en':
+      self.searchByWords(results, lang, media.show, media.year)
+      return
+      
     mediaYear = ''
     if media.year is not None:
       mediaYear = ' (' + media.year + ')'
