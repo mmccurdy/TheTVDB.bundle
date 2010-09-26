@@ -171,8 +171,12 @@ class TVDBAgent(Agent.TV_Shows):
       foundTitle = result[1]
       if len(foundTitle) > 8:
         foundTitle = re.sub(r'([ ]+\(?[0-9]{4}\)?)', '', foundTitle)
+        
+      # Remove prefixes that can screw things up.
+      searchTitle = re.sub('^[Bb][Bb][Cc] ', '', searchTitle)
+      fountTitle = re.sub('^[Bb][Bb][Cc] ', '', foundTitle)
       
-      # Adjust if both have 'the' prefix.
+      # Adjust if both have 'the' prefix by adding a prefix that won't be stripped.
       distTitle = searchTitle
       distFoundTitle = foundTitle
       if searchTitle.lower()[0:4] == 'the ' and foundTitle.lower()[0:4] == 'the ':
@@ -189,6 +193,13 @@ class TVDBAgent(Agent.TV_Shows):
           theScore = theScore - 5
       
       results.Append(MetadataSearchResult(id=result[0], name=result[1], year=result[2], lang=lang, score=theScore))
+    
+    # Sort.
+    results.Sort('score', descending=True)
+    
+    # Only return at most 20 results.
+    if len(results) > 20:
+      del results[20:]
 
   def search(self, results, media, lang):
     
