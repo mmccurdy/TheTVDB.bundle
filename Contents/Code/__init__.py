@@ -14,6 +14,8 @@ TVDB_SEARCH_URL = 'http://%s/api/GetSeries.php?seriesname=%%s&language=%%s' % TV
 TVDB_ADVSEARCH_TVCOM  = 'http://%s/index.php?seriesname=&fieldlocation=2&genre=&year=&network=&zap2it_id=&tvcom_id=%%s&imdb_id=&order=translation&searching=Search&tab=advancedsearch&language=%%s' % TVDB_PROXY
 TVDB_ADVSEARCH_IMDB  = 'http://%s/index.php?seriesname=&fieldlocation=2&genre=&year=&network=&zap2it_id=&tvcom_id=&imdb_id=%%s&order=translation&searching=Search&tab=advancedsearch&language=%%s' % TVDB_PROXY
 TVDB_ADVSEARCH_NETWORK  = 'http://%s/index.php?seriesname=%%s&fieldlocation=1&genre=&year=%%s&network=%%s&zap2it_id=&tvcom_id=&imdb_id=&order=translation&searching=Search&tab=advancedsearch&language=%%s' % TVDB_PROXY
+
+TVDB_GUID_SEARCH  = 'http://freebase.plexapp.com/tv/guid/'
 TVDB_QUICK_SEARCH = 'http://freebase.plexapp.com/tv/names/'
 
 TVDB_SERIES_URL = '%%s/api/%s/series/%%s' % TVDB_API_KEY
@@ -126,6 +128,57 @@ class TVDBAgent(Agent.TV_Shows):
     time.sleep(0.5)
     return res
     
+  def identifierize(self, string):
+      string = re.sub( r"\s+", " ", string.strip())
+      string = unicodedata.normalize('NFKD', unicode(string))
+      string = re.sub(r"['\"!?@#$&%^*\(\)_+\.,;:/]","", string)
+      string = re.sub(r"[_ ]+","_", string)
+      string = string.strip('_')
+      return string.strip().lower()
+
+  def guidize(self, string):
+    hash = hashlib.sha1()
+    hash.update(string.encode('utf-8'))
+    return hash.hexdigest()
+    
+  def dedupe(self, results):
+    toWhack = []
+    resultMap = {}
+    for result in results:
+      if not resultMap.has_key(result.id):
+        resultMap[result.id] = True
+      else:
+        toWhack.append(result)    
+    for dupe in toWhack:
+      results.Remove(dupe)
+    
+  def searchByGuid(self, results, lang, title, year):
+    
+    # Compute the GUIDs.
+    guids = []
+    if year: guids.append(self.guidize('%s_%s' % (self.identifierize(title), year)))
+    guids.append(self.guidize(self.identifierize(title)))
+
+    # Now see if we have any matches.
+    score = 100
+    for guid in guids:
+      try:
+        res = XML.ElementFromURL(TVDB_GUID_SEARCH + guid[0:2] + '/' + guid + '.xml')
+        first_match = res.xpath('//match')[0]
+        if res.get('total') > 100 and int(first_match.get('percentage')) > 75:
+          
+          # Looks like a great match, look up title.
+          xml = XML.ElementFromString(GetResultFromNetwork(TVDB_SERIES_URL % (Dict['ZIP_MIRROR'], first_match.get('guid'), lang)))
+          name = xml.xpath('//Data/Series/SeriesName')[0].text
+          try: year = xml.xpath('//Data/Series/FirstAired')[0].text.split('-')[0]
+          except: year = None
+          
+          results.Append(MetadataSearchResult(id=first_match.get('guid'), name=name, year=year, lang=lang, score=score))
+          score = score - 2
+          
+      except:
+        pass
+    
   def searchByWords(self, results, lang, origTitle, year):
     # Process the text.
     title = origTitle.lower()
@@ -211,9 +264,13 @@ class TVDBAgent(Agent.TV_Shows):
       url = TVDB_PROXY + '?tab=series&id=' + media.show
       self.TVDBurlParse(media, lang, results, 100, 0, url)
 
+    # GUID-based matches.
+    self.searchByGuid(results, lang, media.show, media.year)
+
     # Try turbo word matches.
     if lang == 'en':
       self.searchByWords(results, lang, media.show, media.year)
+      self.dedupe(results)
       return
       
     mediaYear = ''
