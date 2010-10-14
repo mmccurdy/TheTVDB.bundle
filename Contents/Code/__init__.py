@@ -523,6 +523,9 @@ class TVDBAgent(Agent.TV_Shows):
                   # tvdb doesn't have a thumb for this show
                   pass
       
+    # Maintain a list of valid image names
+    valid_names = list()
+    
     @parallelize
     def DownloadImages():
 
@@ -531,7 +534,7 @@ class TVDBAgent(Agent.TV_Shows):
       for banner_el in banners_el.xpath('Banner'):
         i += 1
         @task
-        def DownloadImage(metadata=metadata, banner_el=banner_el, i=i):
+        def DownloadImage(metadata=metadata, banner_el=banner_el, i=i, valid_names=valid_names):
 
           # Parse the banner.
           banner_type, banner_path, banner_lang, banner_thumb, proxy = self.parse_banner(banner_el)
@@ -543,6 +546,8 @@ class TVDBAgent(Agent.TV_Shows):
           # Compute the banner name and prepare the data
           banner_name = banner_root + banner_path
           banner_url = banner_root + banner_thumb
+          
+          valid_names.append(banner_name)
           
           def banner_data(path):
             return GetResultFromNetwork(path, False)
@@ -594,7 +599,12 @@ class TVDBAgent(Agent.TV_Shows):
         if banner_type == 'fanart' and banner_name not in metadata.art:
           try: metadata.art[banner_name] = proxy(self.banner_data(banner_root + banner_thumb), sort_order=i)
           except: pass
-              
+          
+    # Check each poster, background & banner image we currently have saved. If any of the names are no longer valid, remove the image 
+    metadata.posters.validate_keys(valid_names)
+    metadata.art.validate_keys(valid_names)
+    metadata.banners.validate_keys(valid_names)
+      
   def parse_banner(self, banner_el):
     el_text = lambda element, xp: element.xpath(xp)[0].text if element.xpath(xp)[0].text else '' 
 
