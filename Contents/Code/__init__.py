@@ -26,10 +26,6 @@ GOOGLE_JSON_TVDB_TITLE = 'http://ajax.googleapis.com/ajax/services/search/web?v=
 GOOGLE_JSON_BROAD = 'http://ajax.googleapis.com/ajax/services/search/web?v=1.0&rsz=large&q=%s+site:thetvdb.com+%s'
 GOOGLE_JSON_IMDB = 'http://ajax.googleapis.com/ajax/services/search/web?v=1.0&rsz=large&q=%s+site:imdb.com+tv+%s'
 
-BING_JSON_TVDB = 'http://api.bing.net/json.aspx?AppId=879000C53DA17EA8DB4CD1B103C00243FD0EFEE8&Version=2.2&Query=%s+"series+info"+site:thetvdb.com+%s&Sources=web&Web.Count=8&JsonType=raw'
-BING_JSON_TVDB_TITLE = 'http://api.bing.net/json.aspx?AppId=879000C53DA17EA8DB4CD1B103C00243FD0EFEE8&Version=2.2&Query=%s+intitle:"series+info"+site:thetvdb.com+%s&Sources=web&Web.Count=8&JsonType=raw'
-BING_JSON_TVCOM ='http://api.bing.net/json.aspx?AppId=879000C53DA17EA8DB4CD1B103C00243FD0EFEE8&Version=2.2&Query=%s+site:tv.com+%s&Sources=web&Web.Count=8&JsonType=raw'
-
 TVRAGE_SEARCH   = 'http://%s/feeds/search.php?show=%%s' % TVRAGE_PROXY
 
 SCRUB_FROM_TITLE_SEARCH_KEYWORDS = ['uk','us']
@@ -173,22 +169,17 @@ class TVDBAgent(Agent.TV_Shows):
       resultDict = {}
       @parallelize
       def hitSearchEngines():
-        for s in [BING_JSON_TVCOM, BING_JSON_TVDB, GOOGLE_JSON_TVDB, BING_JSON_TVDB_TITLE, GOOGLE_JSON_TVDB_TITLE, GOOGLE_JSON_IMDB, GOOGLE_JSON_BROAD]: #
+        for s in [GOOGLE_JSON_TVDB, GOOGLE_JSON_TVDB_TITLE, GOOGLE_JSON_IMDB, GOOGLE_JSON_BROAD]: #
           resultDict[s] = []
           @task
           def UpdateEpisode(s=s,sv=sv):
             hasResults = False
-            if s in [BING_JSON_TVDB_TITLE, GOOGLE_JSON_TVDB_TITLE]:
+            if s in [GOOGLE_JSON_TVDB_TITLE]:
               tmpMediaShowYear = sv['clean'] #String.Quote((cleanShow + mediaYear).encode('utf-8'), usePlus=True).replace('intitle%3A','intitle:')
             else:
               tmpMediaShowYear = sv['normal']
             #make sure we have results and normalize
-            if s.count('bing.net') > 0:
-              jsonObj = JSON.ObjectFromURL(s % (tmpMediaShowYear, keywords))['SearchResponse']['Web']
-              if jsonObj['Total'] > 0:
-                jsonObj = jsonObj['Results']
-                hasResults = True
-            elif s.count('googleapis.com') > 0:
+            if s.count('googleapis.com') > 0:
               jsonObj = self.getGoogleResult(s % (tmpMediaShowYear, keywords))['responseData']['results']
               if len(jsonObj) > 0:
                 hasResults = True
@@ -198,34 +189,17 @@ class TVDBAgent(Agent.TV_Shows):
               for r in jsonObj:
                 scorePenalty = 0
                 url = None
-                if s == BING_JSON_TVCOM:
-                  TVurl = r['Url'].split('\/')
-                  if len(TVurl) == 1:
-                    TVurl = r['Url'].split('/')
-                  if TVurl[-3] == 'show':
-                    tvID = TVurl[-2]  
-                    try:
-                      url = HTML.ElementFromString(GetResultFromNetwork(TVDB_ADVSEARCH_TVCOM % (tvID, lang))).xpath('//table[@id="listtable"]//tr[2]//a')[0].get('href')
-                      scorePenalty = -5
-                    except:
-                      return
-                  else:
-                    return
-                elif s.count('googleapis.com') > 0:
+                if s.count('googleapis.com') > 0:
                   url = r['unescapedUrl']
-                elif s.count('bing.net') > 0:
-                  url = r['Url']
-            
+                
                 if url:
                   resultDict[s].append((url, scorePenalty))
             
       @parallelize
       def loopResults():
         for s in resultDict:  
-          if s == BING_JSON_TVCOM:
-            score = 93
-          elif s in [GOOGLE_JSON_TVDB, BING_JSON_TVDB, GOOGLE_JSON_IMDB, BING_JSON_TVDB_TITLE, GOOGLE_JSON_TVDB_TITLE, GOOGLE_JSON_BROAD]:
-            score == 99
+          if s in [GOOGLE_JSON_TVDB, GOOGLE_JSON_IMDB, GOOGLE_JSON_TVDB_TITLE, GOOGLE_JSON_BROAD]:
+            score = 99
           else:
             break
           for url, scorePenalty in resultDict[s]:          
