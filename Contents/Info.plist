@@ -20,5 +20,11 @@
 	<string>2</string>
 	<key>PlexPluginMode</key>
 	<string>AlwaysOn</string>
+	<key>PlexAgentAttributionText</key>
+  <string>
+    &lt;a href=&quot;http://thetvdb.com&quot;&gt;TheTVDB.com&lt;/a&gt; is a community driven database of television shows. &lt;br/&gt;
+					It is our aim to be the most complete and accurate source of&lt;br/&gt;
+					information on TV series from many languages and countries.
+  </string>
 </dict>
 </plist>
