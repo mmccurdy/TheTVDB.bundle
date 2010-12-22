@@ -509,6 +509,8 @@ class TVDBAgent(Agent.TV_Shows):
           self.readTags(episode_el, episode.writers, 'Writer')
           
           # Download the episode thumbnail
+          valid_names = list()
+          
           if len(episode_el.xpath('filename')) > 0:
             thumb_file = el_text(episode_el, 'filename')
             if thumb_file != None and len(thumb_file) > 0:
@@ -516,12 +518,15 @@ class TVDBAgent(Agent.TV_Shows):
               thumb_data = GetResultFromNetwork(thumb_url, False)
               
               # Check that the thumb doesn't already exist before downloading it
+              valid_names.append(thumb_url)
               if thumb_url not in episode.thumbs:
                 try:
                   episode.thumbs[thumb_url] = Proxy.Media(thumb_data)
                 except:
                   # tvdb doesn't have a thumb for this show
                   pass
+                  
+          episode.thumbs.validate_keys(valid_names)
       
     # Maintain a list of valid image names
     valid_names = list()
