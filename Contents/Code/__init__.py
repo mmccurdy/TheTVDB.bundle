@@ -38,6 +38,10 @@ EXTRACT_AS_KEYWORDS = ['uk','us','bbc']
 netLock = Thread.Lock()
 
 # Language table
+# NOTE: if you add something here, make sure
+# to add the language to the appropriate 
+# tvdb cache download script on the data
+# processing servers
 THETVDB_LANGUAGES_CODE = {
   'cs': '28',
   'da': '10',
