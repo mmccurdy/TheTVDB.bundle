@@ -38,8 +38,28 @@ EXTRACT_AS_KEYWORDS = ['uk','us','bbc']
 netLock = Thread.Lock()
 
 # Language table
-THETVDB_LANGUAGES_CODE = {'zh': '6', 'en':'7', 'sv': '8', 'no': '9', 'da': '10', 'fi': '11', 'nl': '13', 'de': '14', 'it': '15', 'es': '16', 'fr': '17', 
-                          'pl': '18', 'hu': '19', 'el': '20', 'tr': '21', 'ru': '22', 'he': '24', 'ja': '25', 'pt': '26', 'cs': '28' }
+THETVDB_LANGUAGES_CODE = {
+  'cs': '28',
+  'da': '10',
+  'de': '14',
+  'el': '20',
+  'en': '7',
+  'es': '16',
+  'fi': '11',
+  'fr': '17',
+  'he': '24',
+  'hu': '19',
+  'it': '15',
+  'ja': '25',
+  'nl': '13',
+  'no': '9',
+  'pl': '18',
+  'pt': '26',
+  'ru': '22',
+  'sv': '8',
+  'tr': '21',
+  'zh': '6',
+}
 
 # Keep track of success/failures in a row.
 successCount = 0
