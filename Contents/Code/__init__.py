@@ -1,4 +1,4 @@
-import re, time, unicodedata, hashlib
+import re, time, unicodedata, hashlib, types
 
 # Define proxy for TVDB.
 TVDB_SITE  = 'thetvdb.com'
@@ -15,8 +15,11 @@ TVDB_ADVSEARCH_TVCOM  = 'http://%s/index.php?seriesname=&fieldlocation=2&genre=&
 TVDB_ADVSEARCH_IMDB  = 'http://%s/index.php?seriesname=&fieldlocation=2&genre=&year=&network=&zap2it_id=&tvcom_id=&imdb_id=%%s&order=translation&searching=Search&tab=advancedsearch&language=%%s' % TVDB_PROXY
 TVDB_ADVSEARCH_NETWORK  = 'http://%s/index.php?seriesname=%%s&fieldlocation=1&genre=&year=%%s&network=%%s&zap2it_id=&tvcom_id=&imdb_id=&order=translation&searching=Search&tab=advancedsearch&language=%%s' % TVDB_PROXY
 
-TVDB_GUID_SEARCH  = 'http://freebase.plexapp.com/tv/guid/'
-TVDB_QUICK_SEARCH = 'http://freebase.plexapp.com/tv/names/'
+#TVDB_GUID_SEARCH  = 'http://freebase.plexapp.com/tv/guid/'
+#TVDB_QUICK_SEARCH = 'http://freebase.plexapp.com/tv/names/'
+#
+TVDB_GUID_SEARCH  = 'http://ve.davidbartle.com/tv/guid/'
+TVDB_QUICK_SEARCH = 'http://ve.davidbartle.com/tv/names/'
 
 TVDB_SERIES_URL = '%%s/api/%s/series/%%s' % TVDB_API_KEY
 TVDB_ZIP_URL    = '%s/all/%%s.zip' % TVDB_SERIES_URL
@@ -148,19 +151,6 @@ class TVDBAgent(Agent.TV_Shows):
     time.sleep(0.5)
     return res
     
-  def identifierize(self, string):
-      string = re.sub( r"\s+", " ", string.strip())
-      string = unicodedata.normalize('NFKD', unicode(string))
-      string = re.sub(r"['\"!?@#$&%^*\(\)_+\.,;:/]","", string)
-      string = re.sub(r"[_ ]+","_", string)
-      string = string.strip('_')
-      return string.strip().lower()
-
-  def guidize(self, string):
-    hash = hashlib.sha1()
-    hash.update(string.encode('utf-8'))
-    return hash.hexdigest()
-    
   def dedupe(self, results):
     toWhack = []
     resultMap = {}
@@ -168,36 +158,55 @@ class TVDBAgent(Agent.TV_Shows):
       if not resultMap.has_key(result.id):
         resultMap[result.id] = True
       else:
-        toWhack.append(result)    
+        toWhack.append(result)
     for dupe in toWhack:
       results.Remove(dupe)
     
   def searchByGuid(self, results, lang, title, year):
     
-    # Compute the GUIDs.
-    guids = []
-    if year: guids.append(self.guidize('%s_%s' % (self.identifierize(title), year)))
-    guids.append(self.guidize(self.identifierize(title)))
+    # Compute the GUID
+    guid = self.titleyear_guid(title,year)
 
     # Now see if we have any matches.
     score = 100
-    for guid in guids:
-      try:
-        res = XML.ElementFromURL(TVDB_GUID_SEARCH + guid[0:2] + '/' + guid + '.xml')
-        first_match = res.xpath('//match')[0]
-        if res.get('total') > 100 and int(first_match.get('percentage')) > 75:
-          
-          # Looks like a great match, look up title.
-          xml = XML.ElementFromString(GetResultFromNetwork(TVDB_SERIES_URL % (Dict['ZIP_MIRROR'], first_match.get('guid'), lang)))
-          name = xml.xpath('//Data/Series/SeriesName')[0].text
-          try: year = xml.xpath('//Data/Series/FirstAired')[0].text.split('-')[0]
-          except: year = None
-          
-          results.Append(MetadataSearchResult(id=first_match.get('guid'), name=name, year=year, lang=lang, score=score))
-          score = score - 2
-          
-      except:
-        pass
+    maxLevBonus = 10
+    maxPctBonus = 10
+    try:
+      res = XML.ElementFromURL(TVDB_GUID_SEARCH + guid[0:2] + '/' + guid + '.xml')
+      matchesGroupedById = {}
+      for match in res.xpath('//match'):
+        id    = match.get('guid')
+        count = int(match.get('count'))
+        pct   = int(match.get('percentage')) 
+        titleBonus = int(self.lev_ratio(match.get('title'),title)*maxLevBonus)
+        pctBonus   = int((pct/100.0)*maxPctBonus)
+        bonus      = titleBonus+pctBonus
+        if matchesGroupedById.has_key(id):
+          i = matchesGroupedById.get(id).get('i')
+          matchesGroupedById[id] = {
+             'guid': id,
+             'count': matchesGroupedById.get(id).get('count') + count,
+             'pct':   matchesGroupedById.get(id).get('pct')   + pct,
+             'bonus': matchesGroupedById.get(id).get('bonus') + bonus,
+             'i':     i + 1,
+          }
+        else:
+          matchesGroupedById[id] = { 'guid': id, 'count': count, 'pct': pct, 'bonus': bonus, 'i': 1 }
+
+      # get the summarized items sorted by the sumed 'count' field
+      matches = matchesGroupedById.values()
+      for match in matches:
+        xml = XML.ElementFromString(GetResultFromNetwork(TVDB_SERIES_URL % (Dict['ZIP_MIRROR'], match.get('guid'), lang)))
+        name = xml.xpath('//Data/Series/SeriesName')[0].text
+        try: year = xml.xpath('//Data/Series/FirstAired')[0].text.split('-')[0]
+        except: year = None
+        bonusAve = match.get('bonus')/match.get('i')
+        results.Append(MetadataSearchResult(id=match.get('guid'), name=name, year=year, lang=lang, score=score+bonusAve))
+        score = score - 2
+
+    except Exception, e:
+      Log(repr(e))
+      pass
     
   def searchByWords(self, results, lang, origTitle, year):
     # Process the text.
@@ -258,7 +267,8 @@ class TVDBAgent(Agent.TV_Shows):
         
       # Score adjustments.
       theScore = score + len(Util.LongestCommonSubstring(distTitle, distFoundTitle))
-      theScore = theScore - int(5.0 * Util.LevenshteinDistance(searchTitle, foundTitle)) + result[3] * 2
+      theScore = theScore - int(10 * self.lev_ratio(searchTitle, foundTitle)) + result[3] * 2
+
       if theYear != None and year != None:
         if theYear == year:
           theScore = theScore + 5
@@ -286,12 +296,15 @@ class TVDBAgent(Agent.TV_Shows):
 
     # GUID-based matches.
     self.searchByGuid(results, lang, media.show, media.year)
+    for result in results:
+      Log(result.name + ' ('+ result.id +') score: ' + str(result.score))
 
     # Try turbo word matches.
-    if lang == 'en':
-      self.searchByWords(results, lang, media.show, media.year)
-      self.dedupe(results)
-      return
+    self.searchByWords(results, lang, media.show, media.year)
+    self.dedupe(results)
+    for result in results:
+      Log(result.name + ' ('+ result.id +') score: ' + str(result.score))
+    return
       
     mediaYear = ''
     if media.year is not None:
@@ -325,7 +338,9 @@ class TVDBAgent(Agent.TV_Shows):
       if len(results) > 0:
         results.Sort('score', descending=True)
         if results[0].score >= 80:
+          Log('skipping search engines')
           break #don't bother trying search without year, we have a match
+      Log('hitting search engines')
           
       #run through several search engines
       resultDict = {}
@@ -464,8 +479,8 @@ class TVDBAgent(Agent.TV_Shows):
         if resultMap[y].score <= resultMap[years[i+1]].score:
           resultMap[y].score = resultMap[years[i+1]].score + 1
           
-      #for result in results:
-      #  Log(result.name + ' ('+ result.id +') score: ' + str(result.score))
+      for result in results:
+        Log(result.name + ' ('+ result.id +') score: ' + str(result.score))
   
   def TVDBurlParse(self, media, lang, results, score, scorePenalty, url):
     if url.count('tab=series&id='):
@@ -804,3 +819,49 @@ class TVDBAgent(Agent.TV_Shows):
       if l >= 0:
         cleanShow = cleanShow[:l] + cleanShow[l+len(c)+1:]
     return cleanShow
+
+  def identifierize(self, string):
+      string = re.sub( r"\s+", " ", string.strip())
+      string = unicodedata.normalize('NFKD', self.safe_unicode(string))
+      string = re.sub(r"['\"!?@#$&%^*\(\)_+\.,;:/]","", string)
+      string = re.sub(r"[_ ]+","_", string)
+      string = string.strip('_')
+      return string.strip().lower()
+  
+  def safe_unicode(self, s,encoding='utf-8'):
+    if s is None:
+      return None
+    if isinstance(s, basestring):
+      if isinstance(s, types.UnicodeType):
+        return s
+      else:
+        return s.decode(encoding)
+    else:
+      return str(s).decode(encoding)
+  
+  def guidize(self,string):
+    hash = hashlib.sha1()
+    hash.update(string.encode('utf-8'))
+    return hash.hexdigest()
+  
+  def titleyear_guid(self, title, year=None):
+    if title is None:
+      title = ''
+  
+    if year == '' or year is None or not year:
+      string = u"%s" % self.identifierize(title)
+    else:
+      string = u"%s_%s" % (self.identifierize(title), year)
+    return self.guidize(string)
+
+  def lev_ratio(self,s1,s2):
+    distance = Util.LevenshteinDistance(self.safe_unicode(s1),self.safe_unicode(s2))
+    #Log('s1/s2: %s/%s' % (s1,s2))
+    #Log('distance: %s' % distance)
+    max_len  = float(max([ len(s1), len(s2) ]))
+    #Log('max_len: %s' % max_len)
+    try:
+      return float(1/(distance/max_len))
+    except:
+      return 0.0
+
