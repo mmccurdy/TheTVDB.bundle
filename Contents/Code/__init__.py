@@ -179,8 +179,7 @@ class TVDBAgent(Agent.TV_Shows):
         count = int(match.get('count'))
         pct   = int(match.get('percentage')) 
         titleBonus = int(self.lev_ratio(match.get('title'),title)*maxLevBonus)
-        pctBonus   = int((pct/100.0)*maxPctBonus)
-        bonus      = titleBonus+pctBonus
+        bonus      = titleBonus
         if matchesGroupedById.has_key(id):
           i = matchesGroupedById.get(id).get('i')
           matchesGroupedById[id] = {
@@ -195,13 +194,19 @@ class TVDBAgent(Agent.TV_Shows):
 
       # get the summarized items sorted by the sumed 'count' field
       matches = matchesGroupedById.values()
+      Log('matches')
+      Log(repr(matches))
+
       for match in matches:
         xml = XML.ElementFromString(GetResultFromNetwork(TVDB_SERIES_URL % (Dict['ZIP_MIRROR'], match.get('guid'), lang)))
         name = xml.xpath('//Data/Series/SeriesName')[0].text
         try: year = xml.xpath('//Data/Series/FirstAired')[0].text.split('-')[0]
         except: year = None
-        bonusAve = match.get('bonus')/match.get('i')
-        results.Append(MetadataSearchResult(id=match.get('guid'), name=name, year=year, lang=lang, score=score+bonusAve))
+        levBonusAve = match.get('bonus')/match.get('i')
+        pctBonus   = int((match.get('pct')/100.0)*maxPctBonus)
+        totalBonus = levBonusAve+pctBonus
+        Log("totalBonus: %s" % totalBonus)
+        results.Append(MetadataSearchResult(id=match.get('guid'), name=name, year=year, lang=lang, score=score+totalBonus))
         score = score - 2
 
     except Exception, e:
@@ -331,6 +336,9 @@ class TVDBAgent(Agent.TV_Shows):
       SVmediaShow = {'normal':String.Quote((origShow).encode('utf-8'), usePlus=True).replace('intitle%3A', 'intitle:'),
                      'clean': String.Quote((cleanShow).encode('utf-8'), usePlus=True).replace('intitle%3A', 'intitle:')}
       searchVariations.append(SVmediaShow)
+
+    Log('searchVariations:')
+    Log(repr(searchVariations))
     
     #option to perform searches without the year, in the event we have no results over our match threshold
     for sv in searchVariations:
