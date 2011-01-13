@@ -213,7 +213,7 @@ class TVDBAgent(Agent.TV_Shows):
       Log(repr(e))
       pass
     
-  def searchByWords(self, results, lang, origTitle, year, manual=False):
+  def searchByWords(self, results, lang, origTitle, year):
     # Process the text.
     title = origTitle.lower()
     title = re.sub(r'[\'":\-&,.!~()]', ' ', title)
@@ -289,7 +289,7 @@ class TVDBAgent(Agent.TV_Shows):
     if len(results) > 20:
       del results[20:]
 
-  def search(self, results, media, lang):
+  def search(self, results, media, lang, manual=False):
     
     # MAKE SURE WE USE precomposed form, since that seems to be what TVDB prefers.
     media.show = unicodedata.normalize('NFC', unicode(media.show)).strip()
