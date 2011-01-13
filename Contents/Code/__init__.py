@@ -213,7 +213,7 @@ class TVDBAgent(Agent.TV_Shows):
       Log(repr(e))
       pass
     
-  def searchByWords(self, results, lang, origTitle, year):
+  def searchByWords(self, results, lang, origTitle, year, manual=False):
     # Process the text.
     title = origTitle.lower()
     title = re.sub(r'[\'":\-&,.!~()]', ' ', title)
