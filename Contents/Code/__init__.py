@@ -152,6 +152,10 @@ class TVDBAgent(Agent.TV_Shows):
     return res
     
   def dedupe(self, results):
+
+    # make sure to keep the highest score for the id
+    results.Sort('score', descending=True)
+
     toWhack = []
     resultMap = {}
     for result in results:
