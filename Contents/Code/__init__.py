@@ -192,8 +192,6 @@ class TVDBAgent(Agent.TV_Shows):
 
       # get the summarized items sorted by the sumed 'count' field
       matches = matchesGroupedById.values()
-      Log('matches')
-      Log(repr(matches))
 
       for match in matches:
         xml = XML.ElementFromString(GetResultFromNetwork(TVDB_SERIES_URL % (Dict['ZIP_MIRROR'], match.get('guid'), lang)))
@@ -203,9 +201,6 @@ class TVDBAgent(Agent.TV_Shows):
         levBonusAve = match.get('bonus')/match.get('i')
         pctBonus   = int((match.get('pct')/100.0)*maxPctBonus)
         totalBonus = levBonusAve+pctBonus
-        Log("levBonusAve: %s" % levBonusAve)
-        Log("pctBonus: %s" % pctBonus)
-        Log("totalBonus: %s" % totalBonus)
         results.Append(MetadataSearchResult(id=match.get('guid'), name=name, year=year, lang=lang, score=score+totalBonus))
         score = score - 2
 
@@ -306,14 +301,10 @@ class TVDBAgent(Agent.TV_Shows):
     if not doGoogleSearch:
       # GUID-based matches.
       self.searchByGuid(results, lang, media.show, media.year)
-      for result in results:
-        Log(result.name + ' ('+ result.id +') score: ' + str(result.score))
   
       # Try turbo word matches.
       self.searchByWords(results, lang, media.show, media.year)
       self.dedupe(results)
-      for result in results:
-        Log(result.name + ' ('+ result.id +') score: ' + str(result.score))
 
     if len(results) == 0:
       doGoogleSearch = True
@@ -461,9 +452,6 @@ class TVDBAgent(Agent.TV_Shows):
         if resultMap[y].score <= resultMap[years[i+1]].score:
           resultMap[y].score = resultMap[years[i+1]].score + 1
           
-      for result in results:
-        Log(result.name + ' ('+ result.id +') score: ' + str(result.score))
-  
   def TVDBurlParse(self, media, lang, results, score, scorePenalty, url):
     if url.count('tab=series&id='):
       seriesRx = 'tab=series&id=([0-9]+)'
