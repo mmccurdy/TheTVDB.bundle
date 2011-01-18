@@ -15,11 +15,8 @@ TVDB_ADVSEARCH_TVCOM  = 'http://%s/index.php?seriesname=&fieldlocation=2&genre=&
 TVDB_ADVSEARCH_IMDB  = 'http://%s/index.php?seriesname=&fieldlocation=2&genre=&year=&network=&zap2it_id=&tvcom_id=&imdb_id=%%s&order=translation&searching=Search&tab=advancedsearch&language=%%s' % TVDB_PROXY
 TVDB_ADVSEARCH_NETWORK  = 'http://%s/index.php?seriesname=%%s&fieldlocation=1&genre=&year=%%s&network=%%s&zap2it_id=&tvcom_id=&imdb_id=&order=translation&searching=Search&tab=advancedsearch&language=%%s' % TVDB_PROXY
 
-#TVDB_GUID_SEARCH  = 'http://freebase.plexapp.com/tv/guid/'
-#TVDB_QUICK_SEARCH = 'http://freebase.plexapp.com/tv/names/'
-#
-TVDB_GUID_SEARCH  = 'http://ve.davidbartle.com/tv/guid/'
-TVDB_QUICK_SEARCH = 'http://ve.davidbartle.com/tv/names/'
+TVDB_GUID_SEARCH  = 'http://freebase.plexapp.com/tv/guid/'
+TVDB_QUICK_SEARCH = 'http://freebase.plexapp.com/tv/names/'
 
 TVDB_SERIES_URL = '%%s/api/%s/series/%%s' % TVDB_API_KEY
 TVDB_ZIP_URL    = '%s/all/%%s.zip' % TVDB_SERIES_URL
@@ -601,6 +598,7 @@ class TVDBAgent(Agent.TV_Shows):
     return xml
 
   def update(self, metadata, media, lang):
+    Log("def update()")
     zip_url = TVDB_ZIP_URL % (Dict['ZIP_MIRROR'], metadata.id, lang)
     banner_root = TVDB_BANNER_URL % Dict['IMG_MIRROR']
     
