@@ -209,6 +209,8 @@ class TVDBAgent(Agent.TV_Shows):
         levBonusAve = match.get('bonus')/match.get('i')
         pctBonus   = int((match.get('pct')/100.0)*maxPctBonus)
         totalBonus = levBonusAve+pctBonus
+        Log("levBonusAve: %s" % levBonusAve)
+        Log("pctBonus: %s" % pctBonus)
         Log("totalBonus: %s" % totalBonus)
         results.Append(MetadataSearchResult(id=match.get('guid'), name=name, year=year, lang=lang, score=score+totalBonus))
         score = score - 2
@@ -294,108 +296,113 @@ class TVDBAgent(Agent.TV_Shows):
       del results[20:]
 
   def search(self, results, media, lang, manual=False):
+
+    doGoogleSearch = False
+    if manual:
+      doGoogleSearch = True
     
     # MAKE SURE WE USE precomposed form, since that seems to be what TVDB prefers.
     media.show = unicodedata.normalize('NFC', unicode(media.show)).strip()
 
     # If we got passed in something that looks like an ID, use it.
-    if re.match('^[0-9]+$', media.show) is not None:
+    if len(media.show) > 3 and re.match('^[0-9]+$', media.show) is not None:
       url = TVDB_PROXY + '?tab=series&id=' + media.show
       self.TVDBurlParse(media, lang, results, 100, 0, url)
 
-    # GUID-based matches.
-    self.searchByGuid(results, lang, media.show, media.year)
-    for result in results:
-      Log(result.name + ' ('+ result.id +') score: ' + str(result.score))
-
-    # Try turbo word matches.
-    self.searchByWords(results, lang, media.show, media.year)
-    self.dedupe(results)
-    for result in results:
-      Log(result.name + ' ('+ result.id +') score: ' + str(result.score))
-    return
-      
-    mediaYear = ''
-    if media.year is not None:
-      mediaYear = ' (' + media.year + ')'
-    w = media.show.lower().split(' ')
-    keywords = ''
-    for k in EXTRACT_AS_KEYWORDS:
-      if k.lower() in w:
-        keywords = keywords + k + '+'
-    cleanShow =  self.util_cleanShow(media.show, SCRUB_FROM_TITLE_SEARCH_KEYWORDS)
-    cs = cleanShow.split(' ')
-    cleanShow = ''
-    for x in cs:
-      cleanShow = cleanShow + 'intitle:' + x + ' '
-      
-    cleanShow = cleanShow.strip()
-    origShow = media.show
-    SVmediaShowYear = {'normal':String.Quote((origShow + mediaYear).encode('utf-8'), usePlus=True).replace('intitle%3A', 'intitle:'),
-                       'clean': String.Quote((cleanShow + mediaYear).encode('utf-8'), usePlus=True).replace('intitle%3A','intitle:')}
-    mediaShowYear = SVmediaShowYear['normal']
-    
-    searchVariations = [SVmediaShowYear]
-    if media.year is not None:
-      SVmediaShow = {'normal':String.Quote((origShow).encode('utf-8'), usePlus=True).replace('intitle%3A', 'intitle:'),
-                     'clean': String.Quote((cleanShow).encode('utf-8'), usePlus=True).replace('intitle%3A', 'intitle:')}
-      searchVariations.append(SVmediaShow)
-
-    Log('searchVariations:')
-    Log(repr(searchVariations))
-    
-    #option to perform searches without the year, in the event we have no results over our match threshold
-    for sv in searchVariations:
-      #check to make sure we want to run these searches again WITHOUT the year hint, if there was one passed in
-      if len(results) > 0:
-        results.Sort('score', descending=True)
-        if results[0].score >= 80:
-          Log('skipping search engines')
-          break #don't bother trying search without year, we have a match
-      Log('hitting search engines')
-          
-      #run through several search engines
-      resultDict = {}
-      @parallelize
-      def hitSearchEngines():
-        for s in [GOOGLE_JSON_TVDB, GOOGLE_JSON_TVDB_TITLE, GOOGLE_JSON_IMDB, GOOGLE_JSON_BROAD]: #
-          resultDict[s] = []
-          @task
-          def UpdateEpisode(s=s,sv=sv):
-            hasResults = False
-            if s in [GOOGLE_JSON_TVDB_TITLE]:
-              tmpMediaShowYear = sv['clean'] #String.Quote((cleanShow + mediaYear).encode('utf-8'), usePlus=True).replace('intitle%3A','intitle:')
-            else:
-              tmpMediaShowYear = sv['normal']
-            #make sure we have results and normalize
-            if s.count('googleapis.com') > 0:
-              jsonObj = self.getGoogleResult(s % (tmpMediaShowYear, keywords))['responseData']['results']
-              if len(jsonObj) > 0:
-                hasResults = True
+    if not doGoogleSearch:
+      # GUID-based matches.
+      self.searchByGuid(results, lang, media.show, media.year)
+      for result in results:
+        Log(result.name + ' ('+ result.id +') score: ' + str(result.score))
   
-            #loop through results   
-            if hasResults:
-              for r in jsonObj:
-                scorePenalty = 0
-                url = None
-                if s.count('googleapis.com') > 0:
-                  url = r['unescapedUrl']
-                
-                if url:
-                  resultDict[s].append((url, scorePenalty))
+      # Try turbo word matches.
+      self.searchByWords(results, lang, media.show, media.year)
+      self.dedupe(results)
+      for result in results:
+        Log(result.name + ' ('+ result.id +') score: ' + str(result.score))
+
+    if len(results) == 0:
+      doGoogleSearch = True
+     
+    if doGoogleSearch: 
+      mediaYear = ''
+      if media.year is not None:
+        mediaYear = ' (' + media.year + ')'
+      w = media.show.lower().split(' ')
+      keywords = ''
+      for k in EXTRACT_AS_KEYWORDS:
+        if k.lower() in w:
+          keywords = keywords + k + '+'
+      cleanShow =  self.util_cleanShow(media.show, SCRUB_FROM_TITLE_SEARCH_KEYWORDS)
+      cs = cleanShow.split(' ')
+      cleanShow = ''
+      for x in cs:
+        cleanShow = cleanShow + 'intitle:' + x + ' '
+        
+      cleanShow = cleanShow.strip()
+      origShow = media.show
+      SVmediaShowYear = {'normal':String.Quote((origShow + mediaYear).encode('utf-8'), usePlus=True).replace('intitle%3A', 'intitle:'),
+                         'clean': String.Quote((cleanShow + mediaYear).encode('utf-8'), usePlus=True).replace('intitle%3A','intitle:')}
+      mediaShowYear = SVmediaShowYear['normal']
+      
+      searchVariations = [SVmediaShowYear]
+      if media.year is not None:
+        SVmediaShow = {'normal':String.Quote((origShow).encode('utf-8'), usePlus=True).replace('intitle%3A', 'intitle:'),
+                       'clean': String.Quote((cleanShow).encode('utf-8'), usePlus=True).replace('intitle%3A', 'intitle:')}
+        searchVariations.append(SVmediaShow)
+  
+      #option to perform searches without the year, in the event we have no results over our match threshold
+      for sv in searchVariations:
+        #check to make sure we want to run these searches again WITHOUT the year hint, if there was one passed in
+        if len(results) > 0:
+          results.Sort('score', descending=True)
+          if results[0].score >= 80:
+            Log('skipping search engines')
+            break #don't bother trying search without year, we have a match
+        Log('hitting search engines')
             
-      @parallelize
-      def loopResults():
-        for s in resultDict:  
-          if s in [GOOGLE_JSON_TVDB, GOOGLE_JSON_IMDB, GOOGLE_JSON_TVDB_TITLE, GOOGLE_JSON_BROAD]:
-            score = 99
-          else:
-            break
-          for url, scorePenalty in resultDict[s]:          
+        #run through several search engines
+        resultDict = {}
+        @parallelize
+        def hitSearchEngines():
+          for s in [GOOGLE_JSON_TVDB, GOOGLE_JSON_TVDB_TITLE, GOOGLE_JSON_IMDB, GOOGLE_JSON_BROAD]: #
+            resultDict[s] = []
             @task
-            def lookupResult(score=score, url=url, scorePenalty=scorePenalty):
-              self.TVDBurlParse(media, lang, results, score, scorePenalty, url)
-            score = score - 5
+            def UpdateEpisode(s=s,sv=sv):
+              hasResults = False
+              if s in [GOOGLE_JSON_TVDB_TITLE]:
+                tmpMediaShowYear = sv['clean'] #String.Quote((cleanShow + mediaYear).encode('utf-8'), usePlus=True).replace('intitle%3A','intitle:')
+              else:
+                tmpMediaShowYear = sv['normal']
+              #make sure we have results and normalize
+              if s.count('googleapis.com') > 0:
+                jsonObj = self.getGoogleResult(s % (tmpMediaShowYear, keywords))['responseData']['results']
+                if len(jsonObj) > 0:
+                  hasResults = True
+    
+              #loop through results   
+              if hasResults:
+                for r in jsonObj:
+                  scorePenalty = 0
+                  url = None
+                  if s.count('googleapis.com') > 0:
+                    url = r['unescapedUrl']
+                  
+                  if url:
+                    resultDict[s].append((url, scorePenalty))
+              
+        @parallelize
+        def loopResults():
+          for s in resultDict:  
+            if s in [GOOGLE_JSON_TVDB, GOOGLE_JSON_IMDB, GOOGLE_JSON_TVDB_TITLE, GOOGLE_JSON_BROAD]:
+              score = 99
+            else:
+              break
+            for url, scorePenalty in resultDict[s]:          
+              @task
+              def lookupResult(score=score, url=url, scorePenalty=scorePenalty):
+                self.TVDBurlParse(media, lang, results, score, scorePenalty, url)
+              score = score - 5
       
     #try an exact tvdb match    
     try:
@@ -460,19 +467,8 @@ class TVDBAgent(Agent.TV_Shows):
       Log('TVRage fetch error. Timeout?')
       pass
        
-    results.Sort('score', descending=True)
+    self.dedupe(results)
 
-    # de-dupe the results.
-    toWhack = []
-    resultMap = {}
-    for result in results:
-      if not resultMap.has_key(result.id):
-        resultMap[result.id] = True
-      else:
-        toWhack.append(result)    
-    for dupe in toWhack:
-      results.Remove(dupe)
-    
     favorNewerShows = True
     if favorNewerShows:  
       #hunt for duplicate shows with different years
@@ -868,12 +864,17 @@ class TVDBAgent(Agent.TV_Shows):
 
   def lev_ratio(self,s1,s2):
     distance = Util.LevenshteinDistance(self.safe_unicode(s1),self.safe_unicode(s2))
-    #Log('s1/s2: %s/%s' % (s1,s2))
+    #Log('s1/s2: "%s" / "%s"' % (s1,s2))
     #Log('distance: %s' % distance)
     max_len  = float(max([ len(s1), len(s2) ]))
     #Log('max_len: %s' % max_len)
+
+    ratio = 0.0
     try:
-      return float(1/(distance/max_len))
+      ratio = float(1 - (distance/max_len))
     except:
-      return 0.0
+      pass
+
+    #Log('ratio: %s' % ratio)
+    return ratio
 
