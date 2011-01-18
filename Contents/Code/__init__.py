@@ -9,10 +9,7 @@ TVRAGE_SITE = 'tvrage.com'
 TVRAGE_PROXY = 'tvrage.plexapp.com'
 
 TVDB_API_KEY    = 'D4DDDAEFAD083E6F'
-TVDB_MIRROR_URL = 'http://%s/api/%s/mirrors.xml' % (TVDB_PROXY, TVDB_API_KEY)
 TVDB_SEARCH_URL = 'http://%s/api/GetSeries.php?seriesname=%%s&language=%%s' % TVDB_PROXY 
-TVDB_ADVSEARCH_TVCOM  = 'http://%s/index.php?seriesname=&fieldlocation=2&genre=&year=&network=&zap2it_id=&tvcom_id=%%s&imdb_id=&order=translation&searching=Search&tab=advancedsearch&language=%%s' % TVDB_PROXY
-TVDB_ADVSEARCH_IMDB  = 'http://%s/index.php?seriesname=&fieldlocation=2&genre=&year=&network=&zap2it_id=&tvcom_id=&imdb_id=%%s&order=translation&searching=Search&tab=advancedsearch&language=%%s' % TVDB_PROXY
 TVDB_ADVSEARCH_NETWORK  = 'http://%s/index.php?seriesname=%%s&fieldlocation=1&genre=&year=%%s&network=%%s&zap2it_id=&tvcom_id=&imdb_id=&order=translation&searching=Search&tab=advancedsearch&language=%%s' % TVDB_PROXY
 
 TVDB_GUID_SEARCH  = 'http://freebase.plexapp.com/tv/guid/'
@@ -24,7 +21,6 @@ TVDB_ZIP_URL    = '%s/all/%%s.zip' % TVDB_SERIES_URL
 TVDB_SERIES_URL = '%s/%%s.xml' % TVDB_SERIES_URL
 TVDB_BANNER_URL = '%s/banners/'
 
-GOOGLE_JSON_TVCOM = 'http://ajax.googleapis.com/ajax/services/search/web?v=1.0&rsz=large&q=inurl:show+inurl:summary.html+site:tv.com+%s'   #[might want to look into language/country stuff at some point] param info here: http://code.google.com/apis/ajaxsearch/documentation/reference.html
 GOOGLE_JSON_TVDB = 'http://ajax.googleapis.com/ajax/services/search/web?v=1.0&rsz=large&q=%s+"thetvdb.com"+series+%s'
 GOOGLE_JSON_TVDB_TITLE = 'http://ajax.googleapis.com/ajax/services/search/web?v=1.0&rsz=large&q=%s+"thetvdb.com"+series+info+%s'
 GOOGLE_JSON_BROAD = 'http://ajax.googleapis.com/ajax/services/search/web?v=1.0&rsz=large&q=%s+site:thetvdb.com+%s'
@@ -415,26 +411,6 @@ class TVDBAgent(Agent.TV_Shows):
     except:
       pass
       
-    #try advanced tvdb search
-    #first see if we have any networks in title
-    #networks = ''
-    #w = media.show.lower().split(' ')
-    #for k in NETWORK_IN_TITLE:
-    #  if k.lower() in w:
-    #    networks = networks + k + '+'
-    #searchForTitle =  self.util_cleanShow(media.show, SCRUB_FROM_TITLE_SEARCH_KEYWORDS + NETWORK_IN_TITLE).strip()
-    #ADVscore = 99
-    #year= ''
-    #if year:
-    #  year = str(media.year)
-    #try:
-    #  for el in  HTML.ElementFromString(GetResultFromNetwork(TVDB_ADVSEARCH_NETWORK % (searchForTitle, year, networks[:-1], lang))).xpath('//table[@id="listtable"]//tr')[1:10]:
-    #    url = el.xpath('.//a')[0].get('href').replace('&amp;','&')
-    #    self.TVDBurlParse(media, lang, results, ADVscore, 0, url)
-    #    ADVscore = ADVscore - 1
-    #except:
-    #  pass
-          
     #run through tvRage -> tvdb name matches. the challenge with this is that it can only help a little...there is no tvrage->thetvdb lookup today.
     score = 100
     try:
