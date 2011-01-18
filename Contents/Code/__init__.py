@@ -17,6 +17,7 @@ TVDB_ADVSEARCH_NETWORK  = 'http://%s/index.php?seriesname=%%s&fieldlocation=1&ge
 
 TVDB_GUID_SEARCH  = 'http://freebase.plexapp.com/tv/guid/'
 TVDB_QUICK_SEARCH = 'http://freebase.plexapp.com/tv/names/'
+TVDB_TITLE_SEARCH = 'http://freebase.plexapp.com/tv/titles/'
 
 TVDB_SERIES_URL = '%%s/api/%s/series/%%s' % TVDB_API_KEY
 TVDB_ZIP_URL    = '%s/all/%%s.zip' % TVDB_SERIES_URL
@@ -875,4 +876,41 @@ class TVDBAgent(Agent.TV_Shows):
 
     #Log('ratio: %s' % ratio)
     return ratio
+
+  def best_title_by_language(self, lang, localTitle, tvdbID ):
+ 
+    ## this returns not only the best title, but the best
+    ## levenshtien ratio found amongst all of the titles
+    ## in the title list... the lev ratio is to give an overall
+    ## confidence that the local title corresponds to the
+    ## tvdb id.. even if the picked title is in a language 
+    ## other than the locally named title
+
+    titles = { 'best_lev_ratio': { 'title': None, 'lev_ratio': -1.0 } } # -1 to force > check later
+    try:
+      res = XML.ElementFromURL(TVDB_TITLE_SEARCH + tvdbID[0:2] + '/' + tvdbID + '.xml')
+      for row in res.xpath("/records/record"):
+        t = row['title']
+        l = row['lang']
+        lev   = self.lev_ratio(localTitle,t)
+        titles[lang] = { 'title': t, 'lev_ratio': lev, 'lang': l }
+        if lev > titles.get('best_lev_ratio').get('lev_ratio'):
+          titles['best_lev_ratio'] = { 'title': t, 'lev_ratio': lev, 'lang': l }
+    except Exception, e:
+      Log(e)
+      return (localTitle, lang, 0.0)
+
+    bestLevRatio = titles.get('best_lev_ratio').get('lev_ratio')
+    if bestLevRatio < 0:
+      return (localTitle, lang, 0.0)
+
+    useTitle = None
+    if titles.has_key(lang):
+      useTitle = titles.get(lang)
+    elif titles.has_key('en'):
+      useTitle = titles.get('en')
+    else:
+      useTitle = titles.get('best_lev_ratio')
+
+    return (useTitle.get('title'), useTitle.get('lang'), useTitle.get('lev_ratio'))
 
