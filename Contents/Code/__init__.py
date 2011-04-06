@@ -256,7 +256,7 @@ class TVDBAgent(Agent.TV_Shows):
         
       # Remove prefixes that can screw things up.
       searchTitle = re.sub('^[Bb][Bb][Cc] ', '', searchTitle)
-      fountTitle = re.sub('^[Bb][Bb][Cc] ', '', foundTitle)
+      foundTitle = re.sub('^[Bb][Bb][Cc] ', '', foundTitle)
       
       # Adjust if both have 'the' prefix by adding a prefix that won't be stripped.
       distTitle = searchTitle
