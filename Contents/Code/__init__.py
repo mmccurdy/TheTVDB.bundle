@@ -309,27 +309,27 @@ class TVDBAgent(Agent.TV_Shows):
     if len(results) == 0:
       doGoogleSearch = True
      
-    if doGoogleSearch: 
-      mediaYear = ''
-      if media.year is not None:
-        mediaYear = ' (' + media.year + ')'
-      w = media.show.lower().split(' ')
-      keywords = ''
-      for k in EXTRACT_AS_KEYWORDS:
-        if k.lower() in w:
-          keywords = keywords + k + '+'
-      cleanShow =  self.util_cleanShow(media.show, SCRUB_FROM_TITLE_SEARCH_KEYWORDS)
-      cs = cleanShow.split(' ')
-      cleanShow = ''
-      for x in cs:
-        cleanShow = cleanShow + 'intitle:' + x + ' '
-        
-      cleanShow = cleanShow.strip()
-      origShow = media.show
-      SVmediaShowYear = {'normal':String.Quote((origShow + mediaYear).encode('utf-8'), usePlus=True).replace('intitle%3A', 'intitle:'),
-                         'clean': String.Quote((cleanShow + mediaYear).encode('utf-8'), usePlus=True).replace('intitle%3A','intitle:')}
-      mediaShowYear = SVmediaShowYear['normal']
+    mediaYear = ''
+    if media.year is not None:
+      mediaYear = ' (' + media.year + ')'
+    w = media.show.lower().split(' ')
+    keywords = ''
+    for k in EXTRACT_AS_KEYWORDS:
+      if k.lower() in w:
+        keywords = keywords + k + '+'
+    cleanShow =  self.util_cleanShow(media.show, SCRUB_FROM_TITLE_SEARCH_KEYWORDS)
+    cs = cleanShow.split(' ')
+    cleanShow = ''
+    for x in cs:
+      cleanShow = cleanShow + 'intitle:' + x + ' '
       
+    cleanShow = cleanShow.strip()
+    origShow = media.show
+    SVmediaShowYear = {'normal':String.Quote((origShow + mediaYear).encode('utf-8'), usePlus=True).replace('intitle%3A', 'intitle:'),
+                       'clean': String.Quote((cleanShow + mediaYear).encode('utf-8'), usePlus=True).replace('intitle%3A','intitle:')}
+    mediaShowYear = SVmediaShowYear['normal']
+    
+    if doGoogleSearch:
       searchVariations = [SVmediaShowYear]
       if media.year is not None:
         SVmediaShow = {'normal':String.Quote((origShow).encode('utf-8'), usePlus=True).replace('intitle%3A', 'intitle:'),
@@ -391,6 +391,7 @@ class TVDBAgent(Agent.TV_Shows):
       
     #try an exact tvdb match    
     try:
+      Log('****************** mediaShowYear: ' + mediaShowYear)
       el = XML.ElementFromString(GetResultFromNetwork(TVDB_SEARCH_URL % (mediaShowYear, lang))).xpath('.//Series')[0]
       series_name = el.xpath('SeriesName')[0].text
       if series_name.lower().strip() == media.show.lower().strip():
@@ -399,7 +400,8 @@ class TVDBAgent(Agent.TV_Shows):
       elif series_name[:series_name.rfind('(')].lower().strip() == media.show.lower().strip():
         id = el.xpath('id')[0].text
         self.ParseSeries(media, el, lang, results, 96)
-    except:
+    except Exception, e:
+      Log(repr(e))
       pass
       
     #run through tvRage -> tvdb name matches. the challenge with this is that it can only help a little...there is no tvrage->thetvdb lookup today.
@@ -428,8 +430,8 @@ class TVDBAgent(Agent.TV_Shows):
             pass
         except:
           pass
-    except:    
-      Log('TVRage fetch error. Timeout?')
+    except Exception, e:
+      Log(repr(e))
       pass
        
     self.dedupe(results)
@@ -445,7 +447,7 @@ class TVDBAgent(Agent.TV_Shows):
           
       years = resultMap.keys()
       years.sort(reverse=True)
-    
+
       #bump the score of newer dupes
       i=0
       for y in years[:-1]:
@@ -775,7 +777,7 @@ class TVDBAgent(Agent.TV_Shows):
     return (banner_type, banner_path, banner_lang, banner_thumb, proxy)
   
   def banner_data(self, path):
-      return GetResultFromNetwork(path, False)
+    return GetResultFromNetwork(path, False)
   
   def util_cleanShow(self, cleanShow, scrubList):
     for word in scrubList:
@@ -792,12 +794,12 @@ class TVDBAgent(Agent.TV_Shows):
     return cleanShow
 
   def identifierize(self, string):
-      string = re.sub( r"\s+", " ", string.strip())
-      string = unicodedata.normalize('NFKD', self.safe_unicode(string))
-      string = re.sub(r"['\"!?@#$&%^*\(\)_+\.,;:/]","", string)
-      string = re.sub(r"[_ ]+","_", string)
-      string = string.strip('_')
-      return string.strip().lower()
+    string = re.sub( r"\s+", " ", string.strip())
+    string = unicodedata.normalize('NFKD', self.safe_unicode(string))
+    string = re.sub(r"['\"!?@#$&%^*\(\)_+\.,;:/]","", string)
+    string = re.sub(r"[_ ]+","_", string)
+    string = string.strip('_')
+    return string.strip().lower()
   
   def safe_unicode(self, s,encoding='utf-8'):
     if s is None:
