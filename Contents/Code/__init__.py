@@ -166,9 +166,9 @@ class TVDBAgent(Agent.TV_Shows):
     guid = self.titleyear_guid(title,year)
 
     # Now see if we have any matches.
-    score = 100
+    score = 70
     maxLevBonus = 10
-    maxPctBonus = 10
+    maxPctBonus = 30
     try:
       res = XML.ElementFromURL(TVDB_GUID_SEARCH + guid[0:2] + '/' + guid + '.xml')
       matchesGroupedById = {}
@@ -177,6 +177,7 @@ class TVDBAgent(Agent.TV_Shows):
         count = int(match.get('count'))
         pct   = int(match.get('percentage')) 
         titleBonus = int(self.lev_ratio(match.get('title'),title)*maxLevBonus)
+        titleBonus += len(Util.LongestCommonSubstring(match.get('title'),title))
         bonus      = titleBonus
         if matchesGroupedById.has_key(id):
           i = matchesGroupedById.get(id).get('i')
@@ -198,11 +199,10 @@ class TVDBAgent(Agent.TV_Shows):
         name = xml.xpath('//Data/Series/SeriesName')[0].text
         try: year = xml.xpath('//Data/Series/FirstAired')[0].text.split('-')[0]
         except: year = None
-        levBonusAve = match.get('bonus')/match.get('i')
+        levBonusAve = match.get('bonus') / 10 * (match.get('count')/10000)
         pctBonus   = int((match.get('pct')/100.0)*maxPctBonus)
         totalBonus = levBonusAve+pctBonus
         results.Append(MetadataSearchResult(id=match.get('guid'), name=name, year=year, lang=lang, score=score+totalBonus))
-        score = score - 2
 
     except Exception, e:
       Log(repr(e))
@@ -241,7 +241,7 @@ class TVDBAgent(Agent.TV_Shows):
     resultList = show_map.values()  
     resultList.sort(lambda x, y: cmp(y[3],x[3]))
     
-    score = 90
+    score = 70
     for result in resultList:
       theYear = result[2]
       
@@ -267,14 +267,14 @@ class TVDBAgent(Agent.TV_Shows):
         
       # Score adjustments.
       theScore = score + len(Util.LongestCommonSubstring(distTitle, distFoundTitle))
-      theScore = theScore - int(10 * self.lev_ratio(searchTitle, foundTitle)) + result[3] * 2
+      theScore = theScore + int(10 * self.lev_ratio(searchTitle, foundTitle)) + result[3] * 2
 
       if theYear != None and year != None:
         if theYear == year:
           theScore = theScore + 5
         elif theYear != year:
           theScore = theScore - 5
-      
+          
       results.Append(MetadataSearchResult(id=result[0], name=result[1], year=result[2], lang=lang, score=theScore))
     
     # Sort.
@@ -447,7 +447,7 @@ class TVDBAgent(Agent.TV_Shows):
           
       years = resultMap.keys()
       years.sort(reverse=True)
-
+      
       #bump the score of newer dupes
       i=0
       for y in years[:-1]:
