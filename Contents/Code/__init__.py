@@ -52,6 +52,7 @@ THETVDB_LANGUAGES_CODE = {
   'hu': '19',
   'it': '15',
   'ja': '25',
+  'ko': '32',
   'nl': '13',
   'no': '9',
   'pl': '18',
