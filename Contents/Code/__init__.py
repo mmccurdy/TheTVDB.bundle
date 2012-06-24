@@ -286,7 +286,10 @@ class TVDBAgent(Agent.TV_Shows):
       del results[20:]
 
   def search(self, results, media, lang, manual=False):
-
+    # if we hinted that this is not something episodic (something theTVDB likely would not have), then let's skip trying to match it
+    if media.episodic == 'False':
+      return
+      
     doGoogleSearch = False
     if manual:
       doGoogleSearch = True
