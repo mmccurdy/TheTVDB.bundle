@@ -91,6 +91,8 @@ def GetResultFromNetwork(url, fetchContent=True):
         result = HTTP.Request(url, headers=headers, timeout=60)
         if fetchContent:
           result = result.content
+        else:
+          headers = result.headers
         
         failureCount = 0
         successCount += 1
