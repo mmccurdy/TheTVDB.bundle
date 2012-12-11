@@ -90,7 +90,7 @@ def GetResultFromNetwork(url, fetchContent=True):
       result = None
 
       try:
-        result = HTTP.Request(url, headers=headers, timeout=60, cacheTime=0)
+        result = HTTP.Request(url, headers=headers, timeout=60)
         if fetchContent:
           result = result.content
         else:
