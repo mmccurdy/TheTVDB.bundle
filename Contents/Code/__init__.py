@@ -88,28 +88,31 @@ def GetResultFromNetwork(url, fetchContent=True):
     while tries > 0:
 
       try:
-        result = HTTP.Request(url, headers=headers, timeout=60)
-        if fetchContent:
-          result = result.content
-        else:
-          headers = result.headers
-        
+
+        try:
+          result = HTTP.Request(url, headers=headers, timeout=60)
+          if fetchContent:
+            result = result.content
+          else:
+            headers = result.headers
+
+        except Exception, e:
+
+          # Fast fail a not found.
+          if e.code == 404:
+            return None
+
         failureCount = 0
         successCount += 1
-          
+
         if successCount > 20:
           RETRY_TIMEOUT = max(MIN_RETRY_TIMEOUT, RETRY_TIMEOUT/2)
           successCount = 0
-        
+
         # DONE!
         return result
-        
-      except Exception, e:
-        
-        # Fast fail a not found.
-        if e.code == 404:
-          return None
-        
+
+      except:
         failureCount += 1
         Log("Failure (%d in a row)" % failureCount)
         successCount = 0
