@@ -87,21 +87,21 @@ def GetResultFromNetwork(url, fetchContent=True):
     tries = TOTAL_TRIES
     while tries > 0:
 
+      result = None
+
       try:
+        result = HTTP.Request(url, headers=headers, timeout=60, cacheTime=0)
+        if fetchContent:
+          result = result.content
+        else:
+          test = result.headers
 
-        try:
-          result = HTTP.Request(url, headers=headers, timeout=60)
-          if fetchContent:
-            result = result.content
-          else:
-            headers = result.headers
+      except Exception, e:
+        # Fast fail a not found.
+        if e.code == 404:
+          return None
 
-        except Exception, e:
-
-          # Fast fail a not found.
-          if e.code == 404:
-            return None
-
+      if result is not None:
         failureCount = 0
         successCount += 1
 
@@ -112,27 +112,27 @@ def GetResultFromNetwork(url, fetchContent=True):
         # DONE!
         return result
 
-      except:
+      else:
         failureCount += 1
         Log("Failure (%d in a row)" % failureCount)
         successCount = 0
         time.sleep(RETRY_TIMEOUT)
-      
+
         if failureCount > 5:
           RETRY_TIMEOUT = min(10, RETRY_TIMEOUT * 1.5)
           failureCount = 0
-          
+
       # On the last tries, attempt to contact the original URL.
       tries = tries - 1
       if tries == BACKUP_TRIES:
         url = url.replace(TVDB_PROXY, TVDB_SITE)
         Log("Falling back to non-proxied URL: " + url)
-  
+
   finally:
     netLock.release()
-    
+
   return None
-    
+
 def Start():
   
   Dict['ZIP_MIRROR'] = 'http://' + TVDB_PROXY
@@ -578,7 +578,7 @@ class TVDBAgent(Agent.TV_Shows):
     # Get the show's zipped data
     zip_data = GetResultFromNetwork(zip_url)
     zip_archive = Archive.Zip(zip_data)
-    
+
     # Extract the XML files from the archive. Work around corrupt XML.
     root_el = XML.ElementFromString(self.fixBrokenXml(zip_archive[lang+'.xml']))
     actors_el = XML.ElementFromString(self.fixBrokenXml(zip_archive['actors.xml']))
