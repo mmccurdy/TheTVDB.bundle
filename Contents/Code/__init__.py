@@ -93,8 +93,6 @@ def GetResultFromNetwork(url, fetchContent=True):
         result = HTTP.Request(url, headers=headers, timeout=60)
         if fetchContent:
           result = result.content
-        else:
-          test = result.headers
 
       except Exception, e:
         # Fast fail a not found.
