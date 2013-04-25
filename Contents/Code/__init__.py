@@ -4,10 +4,6 @@ import re, time, unicodedata, hashlib, types
 TVDB_SITE  = 'thetvdb.com'
 TVDB_PROXY = 'thetvdb.plexapp.com'
 
-# Define proxy for TV Rage.
-TVRAGE_SITE = 'tvrage.com'
-TVRAGE_PROXY = 'tvrage.plexapp.com'
-
 TVDB_API_KEY    = 'D4DDDAEFAD083E6F'
 TVDB_SEARCH_URL = 'http://%s/api/GetSeries.php?seriesname=%%s&language=%%s' % TVDB_PROXY 
 TVDB_ADVSEARCH_NETWORK  = 'http://%s/index.php?seriesname=%%s&fieldlocation=1&genre=&year=%%s&network=%%s&zap2it_id=&tvcom_id=&imdb_id=&order=translation&searching=Search&tab=advancedsearch&language=%%s' % TVDB_PROXY
@@ -25,8 +21,6 @@ GOOGLE_JSON_TVDB = 'http://ajax.googleapis.com/ajax/services/search/web?v=1.0&rs
 GOOGLE_JSON_TVDB_TITLE = 'http://ajax.googleapis.com/ajax/services/search/web?v=1.0&rsz=large&q=%s+"thetvdb.com"+series+info+%s'
 GOOGLE_JSON_BROAD = 'http://ajax.googleapis.com/ajax/services/search/web?v=1.0&rsz=large&q=%s+site:thetvdb.com+%s'
 GOOGLE_JSON_IMDB = 'http://ajax.googleapis.com/ajax/services/search/web?v=1.0&rsz=large&q=%s+site:imdb.com+tv+%s'
-
-TVRAGE_SEARCH   = 'http://%s/feeds/search.php?show=%%s' % TVRAGE_PROXY
 
 SCRUB_FROM_TITLE_SEARCH_KEYWORDS = ['uk','us']
 NETWORK_IN_TITLE = ['bbc']
@@ -408,36 +402,6 @@ class TVDBAgent(Agent.TV_Shows):
       Log(repr(e))
       pass
       
-    #run through tvRage -> tvdb name matches. the challenge with this is that it can only help a little...there is no tvrage->thetvdb lookup today.
-    score = 100
-    try:
-      for r in XML.ElementFromString(GetResultFromNetwork(TVRAGE_SEARCH % mediaShowYear)).xpath('//show')[:4]:
-        score = score - 3
-        tvrageName = r.xpath('name')[0].text
-        tvrageLink = r.xpath('link')[0].text
-        network = HTML.ElementFromString(GetResultFromNetwork(tvrageLink.replace('www.tvrage.com', TVRAGE_PROXY))).xpath('//a[contains(@href,"/networks")]')[0].text_content()
-        #Log("****************" + network  )
-        try:
-          ADVscore = 100
-          year= ''
-          if year:
-            year = str(media.year)
-          #language mapping by using http://www.thetvdb.com/wiki/index.php/Multi_Language :  
-          tvdbLang = THETVDB_LANGUAGES_CODE[lang]
-          
-          try:
-            for el in  HTML.ElementFromString(GetResultFromNetwork(TVDB_ADVSEARCH_NETWORK % (String.Quote(searchForTitle), year, String.Quote(network), tvdbLang))).xpath('//table[@id="listtable"]//tr')[1:3]:
-              url = el.xpath('.//a')[0].get('href').replace('&amp;','&')
-              self.TVDBurlParse(media, lang, results, ADVscore, 0, url)
-              ADVscore = ADVscore - 5
-          except:
-            pass
-        except:
-          pass
-    except Exception, e:
-      Log(repr(e))
-      pass
-       
     self.dedupe(results)
 
     favorNewerShows = True
