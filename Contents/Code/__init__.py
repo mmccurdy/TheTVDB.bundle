@@ -8,9 +8,9 @@ TVDB_API_KEY    = 'D4DDDAEFAD083E6F'
 TVDB_SEARCH_URL = 'http://%s/api/GetSeries.php?seriesname=%%s&language=%%s' % TVDB_PROXY 
 TVDB_ADVSEARCH_NETWORK  = 'http://%s/index.php?seriesname=%%s&fieldlocation=1&genre=&year=%%s&network=%%s&zap2it_id=&tvcom_id=&imdb_id=&order=translation&searching=Search&tab=advancedsearch&language=%%s' % TVDB_PROXY
 
-TVDB_GUID_SEARCH  = 'http://freebase.plexapp.com/tv/guid/'
-TVDB_QUICK_SEARCH = 'http://freebase.plexapp.com/tv/names/'
-TVDB_TITLE_SEARCH = 'http://freebase.plexapp.com/tv/titles/'
+TVDB_GUID_SEARCH  = 'http://meta.plex.tv/tv/guid/'
+TVDB_QUICK_SEARCH = 'http://meta.plex.tv/tv/names/'
+TVDB_TITLE_SEARCH = 'http://meta.plex.tv/tv/titles/'
 
 TVDB_SERIES_URL = '%%s/api/%s/series/%%s' % TVDB_API_KEY
 TVDB_ZIP_URL    = '%s/all/%%s.zip' % TVDB_SERIES_URL
@@ -57,73 +57,28 @@ THETVDB_LANGUAGES_CODE = {
   'zh': '6',
 }
 
-# Keep track of success/failures in a row.
-successCount = 0
-failureCount = 0
+GOOD_MATCH_THRESHOLD = 98 # Short circuit once we find a match better than this.
 
-MIN_RETRY_TIMEOUT = 2
-RETRY_TIMEOUT = MIN_RETRY_TIMEOUT
-TOTAL_TRIES   = 1
-BACKUP_TRIES  = -1
-
-headers = {'User-agent': 'Plex/Nine'}
+HEADERS = {'User-agent': 'Plex/Nine'}
 
 def GetResultFromNetwork(url, fetchContent=True):
-  global successCount, failureCount, RETRY_TIMEOUT
 
-  # Not sure where this is introduced, but avoid spaces.
-  #url = url.replace(' ','+')
-  
-  try:
-    netLock.acquire()
     Log("Retrieving URL: " + url)
 
-    tries = TOTAL_TRIES
-    while tries > 0:
-
-      result = None
-
+    try:
+      result = HTTP.Request(url, headers=HEADERS, timeout=60)
+    except:
       try:
-        result = HTTP.Request(url, headers=headers, timeout=60)
-        if fetchContent:
-          result = result.content
-
-      except Exception, e:
-        # Fast fail a not found.
-        if e.code == 404:
-          return None
-
-      if result is not None:
-        failureCount = 0
-        successCount += 1
-
-        if successCount > 20:
-          RETRY_TIMEOUT = max(MIN_RETRY_TIMEOUT, RETRY_TIMEOUT/2)
-          successCount = 0
-
-        # DONE!
-        return result
-
-      else:
-        failureCount += 1
-        Log("Failure (%d in a row)" % failureCount)
-        successCount = 0
-        time.sleep(RETRY_TIMEOUT)
-
-        if failureCount > 5:
-          RETRY_TIMEOUT = min(10, RETRY_TIMEOUT * 1.5)
-          failureCount = 0
-
-      # On the last tries, attempt to contact the original URL.
-      tries = tries - 1
-      if tries == BACKUP_TRIES:
         url = url.replace(TVDB_PROXY, TVDB_SITE)
         Log("Falling back to non-proxied URL: " + url)
+        result = HTTP.Request(url, headers=HEADERS, timeout=60)
+      except:
+        return None
 
-  finally:
-    netLock.release()
+    if fetchContent:
+      result = result.content
 
-  return None
+    return result
 
 def Start():
   
@@ -163,44 +118,28 @@ class TVDBAgent(Agent.TV_Shows):
     # Compute the GUID
     guid = self.titleyear_guid(title,year)
 
-    # Now see if we have any matches.
-    score = 70
-    maxLevBonus = 10
-    maxPctBonus = 30
+    penalty = 0
+    maxPercentPenalty = 30
+    maxLevPenalty = 10
+
     try:
       res = XML.ElementFromURL(TVDB_GUID_SEARCH + guid[0:2] + '/' + guid + '.xml')
-      matchesGroupedById = {}
       for match in res.xpath('//match'):
-        id    = match.get('guid')
+        guid    = match.get('guid')
         count = int(match.get('count'))
-        pct   = int(match.get('percentage')) 
-        titleBonus = int(self.lev_ratio(match.get('title'),title)*maxLevBonus)
-        titleBonus += len(Util.LongestCommonSubstring(match.get('title'),title))
-        bonus      = titleBonus
-        if matchesGroupedById.has_key(id):
-          i = matchesGroupedById.get(id).get('i')
-          matchesGroupedById[id] = {
-             'guid': id,
-             'count': matchesGroupedById.get(id).get('count') + count,
-             'pct':   matchesGroupedById.get(id).get('pct')   + pct,
-             'bonus': matchesGroupedById.get(id).get('bonus') + bonus,
-             'i':     i + 1,
-          }
-        else:
-          matchesGroupedById[id] = { 'guid': id, 'count': count, 'pct': pct, 'bonus': bonus, 'i': 1 }
+        pct   = int(match.get('percentage'))
+        penalty += int(maxPercentPenalty * ((100-pct)/100.0))
 
-      # get the summarized items sorted by the sumed 'count' field
-      matches = matchesGroupedById.values()
-
-      for match in matches:
-        xml = XML.ElementFromString(GetResultFromNetwork(TVDB_SERIES_URL % (Dict['ZIP_MIRROR'], match.get('guid'), lang)))
-        name = xml.xpath('//Data/Series/SeriesName')[0].text
-        try: year = xml.xpath('//Data/Series/FirstAired')[0].text.split('-')[0]
-        except: year = None
-        levBonusAve = match.get('bonus') / 10 * (match.get('count')/10000)
-        pctBonus   = int((match.get('pct')/100.0)*maxPctBonus)
-        totalBonus = levBonusAve+pctBonus
-        results.Append(MetadataSearchResult(id=match.get('guid'), name=name, year=year, lang=lang, score=score+totalBonus))
+        try:
+          xml = XML.ElementFromString(GetResultFromNetwork(TVDB_SERIES_URL % (Dict['ZIP_MIRROR'], guid, lang)))
+          name = xml.xpath('//Data/Series/SeriesName')[0].text
+          penalty += int(maxLevPenalty * (1 - self.lev_ratio(name,title)))
+          try: year = xml.xpath('//Data/Series/FirstAired')[0].text.split('-')[0]
+          except: year = None
+          Log('Adding (based on guid lookup) id: %s, name: %s, year: %s, lang: %s, score: %s' % (match.get('guid'),name,year,lang,100-penalty))
+          results.Append(MetadataSearchResult(id=match.get('guid'), name=name, year=year, lang=lang, score=100-penalty))
+        except:
+          continue
 
     except Exception, e:
       Log(repr(e))
@@ -239,8 +178,13 @@ class TVDBAgent(Agent.TV_Shows):
     resultList = show_map.values()  
     resultList.sort(lambda x, y: cmp(y[3],x[3]))
     
-    score = 70
-    for result in resultList:
+
+    for i,result in enumerate(resultList):
+
+      if i > 10:
+        break
+
+      score = 100
       theYear = result[2]
       
       # Remove year suffixes that can mess things up.
@@ -263,24 +207,29 @@ class TVDBAgent(Agent.TV_Shows):
         distTitle = 'xxx' + searchTitle
         distFoundTitle = 'xxx' + foundTitle
         
-      # Score adjustments.
-      theScore = score + len(Util.LongestCommonSubstring(distTitle, distFoundTitle))
-      theScore = theScore + int(10 * self.lev_ratio(searchTitle, foundTitle)) + result[3] * 2
+      # Score adjustment for title distance.
+      score = score - int(30 * (1 - self.lev_ratio(searchTitle, foundTitle)))
 
-      if theYear != None and year != None:
-        if theYear == year:
-          theScore = theScore + 5
-        elif theYear != year:
-          theScore = theScore - 5
-          
-      results.Append(MetadataSearchResult(id=result[0], name=result[1], year=result[2], lang=lang, score=theScore))
+      # Discount for mismatched years.
+      if theYear != None and year != None and theYear != year:
+        score = score - 5
+
+      # Discout for later results.
+      score = score - i * 5
+
+      if score > 0:
+
+        # Make sure TheTVDB has heard of this show and we'll be able to parse the results.
+        try: 
+          res = XML.ElementFromString(GetResultFromNetwork(TVDB_SERIES_URL % (Dict['ZIP_MIRROR'], result[0], lang)))
+          Log('Adding (based on word matches) id: %s, name: %s, year: %s, lang: %s, score: %s' % (result[0],result[1],result[2],lang,score))
+          results.Append(MetadataSearchResult(id=result[0], name=result[1], year=result[2], lang=lang, score=score))
+        except:
+          Log('Skipping match with id %s: failed TVDB lookup.' % result[0])
     
     # Sort.
     results.Sort('score', descending=True)
-    
-    # Only return at most 20 results.
-    if len(results) > 20:
-      del results[20:]
+
 
   def search(self, results, media, lang, manual=False):
 
@@ -297,12 +246,19 @@ class TVDBAgent(Agent.TV_Shows):
       self.TVDBurlParse(media, lang, results, 100, 0, url)
 
     if not doGoogleSearch:
+      
       # GUID-based matches.
       self.searchByGuid(results, lang, media.show, media.year)
-  
-      # Try turbo word matches.
-      self.searchByWords(results, lang, media.show, media.year)
-      self.dedupe(results)
+      results.Sort('score', descending=True)
+      if not len(results) or results[0].score <= GOOD_MATCH_THRESHOLD:
+        # No good-enough matches in GUID search, try word matches.
+        self.searchByWords(results, lang, media.show, media.year)
+        self.dedupe(results)
+        results.Sort('score', descending=True)
+
+    Log('After GUID/word matching:')
+    for i,r in enumerate(results):
+      Log('Found result: ' + str(results[i]))
 
     if len(results) == 0:
       doGoogleSearch = True
@@ -389,15 +345,15 @@ class TVDBAgent(Agent.TV_Shows):
       
     #try an exact tvdb match    
     try:
-      Log('****************** mediaShowYear: ' + mediaShowYear)
+      Log('Searching for exact match with: ' + mediaShowYear)
       el = XML.ElementFromString(GetResultFromNetwork(TVDB_SEARCH_URL % (mediaShowYear, lang))).xpath('.//Series')[0]
       series_name = el.xpath('SeriesName')[0].text
       if series_name.lower().strip() == media.show.lower().strip():
         id = el.xpath('id')[0].text
-        self.ParseSeries(media, el, lang, results, 99)
+        self.ParseSeries(media, el, lang, results, 90)
       elif series_name[:series_name.rfind('(')].lower().strip() == media.show.lower().strip():
         id = el.xpath('id')[0].text
-        self.ParseSeries(media, el, lang, results, 96)
+        self.ParseSeries(media, el, lang, results, 86)
     except Exception, e:
       Log(repr(e))
       pass
